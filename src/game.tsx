@@ -59,19 +59,111 @@ const setupGame = (): GameState => {
 
 //Scoring
 const calculateHandScore = (hand: Hand): number => {
-  return 0;
+  let score = 0;
+  let aceCount = 0;
+
+  hand.forEach((card) => {
+    let value: number;
+
+    switch (card.rank) {
+      case CardRank.Ace:
+        value = 11;
+        break;
+      case CardRank.King:
+      case CardRank.Queen:
+      case CardRank.Jack:
+      case CardRank.Ten:
+        value = 10;
+        break;
+      default:
+        value = parseInt(card.rank, 10);
+    }
+
+    score += value;
+
+    if (card.rank === CardRank.Ace) {
+      aceCount += 1;
+    }
+  });
+
+  while (score > 21 && aceCount > 0) {
+    score -= 10;
+    aceCount -= 1;
+  }
+
+  return score;
+};
+
+// Determine if a hand has a blackjack
+const hasBlackJack = (hand: Hand): boolean => {
+  if (hand.length !== 2) {
+    return false;
+  }
+
+  const firstCardIsAce = hand[0].rank === CardRank.Ace;
+  const secondCardIsAce = hand[1].rank === CardRank.Ace;
+  const firstCardIsFaceOrTen =
+    parseInt(hand[0].rank) === 10 ||
+    hand[0].rank === CardRank.King ||
+    hand[0].rank === CardRank.Queen ||
+    hand[0].rank === CardRank.Jack;
+  const secondCardIsFaceOrTen =
+    parseInt(hand[1].rank) === 10 ||
+    hand[1].rank === CardRank.King ||
+    hand[1].rank === CardRank.Queen ||
+    hand[1].rank === CardRank.Jack;
+
+  return (
+    (firstCardIsAce && secondCardIsFaceOrTen) ||
+    (firstCardIsFaceOrTen && secondCardIsAce)
+  );
 };
 
 const determineGameResult = (state: GameState): GameResult => {
-  return "no_result";
+  const playerScore = calculateHandScore(state.playerHand);
+  const dealerScore = calculateHandScore(state.dealerHand);
+
+  if (playerScore > 21) {
+    return "dealer_win";
+  } else if (dealerScore > 21) {
+    return "player_win";
+  } else if (
+    hasBlackJack(state.playerHand) &&
+    !hasBlackJack(state.dealerHand)
+  ) {
+    return "player_win";
+  } else if (
+    hasBlackJack(state.dealerHand) &&
+    !hasBlackJack(state.playerHand)
+  ) {
+    return "dealer_win";
+  } else if (playerScore === dealerScore) {
+    return "draw";
+  } else if (playerScore > dealerScore) {
+    return "player_win";
+  } else {
+    return "dealer_win";
+  }
 };
 
 //Player Actions
 const playerStands = (state: GameState): GameState => {
-  return {
-    ...state,
-    turn: "dealer_turn",
-  };
+  const dealerScore = calculateHandScore(state.dealerHand);
+
+  if (state.turn === "player_turn" && dealerScore <= 16) {
+    const { card, remaining } = takeCard(state.cardDeck);
+    return {
+      ...state,
+      cardDeck: remaining,
+      dealerHand: [...state.dealerHand, card],
+      turn: "dealer_turn",
+    };
+  } else {
+    return {
+      ...state,
+      turn: "dealer_turn",
+    };
+  }
 };
 
 const playerHits = (state: GameState): GameState => {
@@ -103,7 +195,9 @@ const Game = (): JSX.Element => {
         >
           Stand
         </button>
-        <button onClick={(): void => setState(setupGame())}>Reset</button>
+        <button onClick={(): void => setState(setupGame())}>
+          Reset
+        </button>
       </div>
       <p>Player Cards</p>
       <div>
